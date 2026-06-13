@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { login, verifyEmail, sendVerifyCode, LoginResponse } from "@/lib/auth-api";
 import { ApiError } from "@/lib/api-client";
+import { setToken } from "@/lib/token-store";
 import Link from "next/link";
 
 // The exact message the backend sends for unverified accounts
@@ -16,6 +18,7 @@ interface UserInfo {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -42,7 +45,9 @@ export default function LoginPage() {
 
     try {
       const res: LoginResponse = await login(email, password);
+      setToken(res.data.accessToken);
       setUser({ accessToken: res.data.accessToken, email });
+      router.push("/tests");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.message === NOT_VERIFIED_MSG) {
