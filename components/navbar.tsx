@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { clearToken } from "@/lib/token-store";
 import { logout } from "@/lib/auth-api";
 import { useState } from "react";
+import Image from "next/image";
 
 const NAV_LINKS = [
   { href: "/tests", label: "Tests", icon: "📝" },
@@ -35,7 +36,13 @@ export default function Navbar() {
       <div style={s.inner}>
         {/* Logo */}
         <Link href="/tests" style={s.logo}>
-          <span style={s.logoIcon}>⚡</span>
+          <Image
+            src="/imgs/logo.png"
+            alt="Lumen Logo"
+            width={100}
+            height={100}
+            style={s.logoImage}
+          />
           <span style={s.logoText}>Lumen</span>
         </Link>
 
@@ -120,8 +127,8 @@ const s: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     marginRight: 16,
   },
-  logoIcon: {
-    fontSize: 20,
+  logoImage: {
+    objectFit: "contain",
   },
   logoText: {
     fontSize: 18,
