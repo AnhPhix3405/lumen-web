@@ -147,6 +147,25 @@ export const createExam = (body: {
     body: JSON.stringify(body),
   });
 
+export const updateExam = (
+  examId: string,
+  body: {
+    name?: string;
+    description?: string;
+    durationMinutes?: number;
+    totalScore?: number;
+    visibility?: string;
+    thumbnailUrl?: string;
+    examTypeId?: string;
+    isPublished?: boolean;
+  }
+) =>
+  authed<{ data: ExamSummary; message: string; status: number }>(`/exam/update/${examId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+
+
 // ─── Exam Types ───────────────────────────────────────────────────────────────
 
 export const listExamTypes = () =>
