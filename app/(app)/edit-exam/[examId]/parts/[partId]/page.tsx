@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getPartDetails, createQuestionGroup, createStandaloneQuestion, Part, QuestionGroup, Question } from "@/lib/exam-api";
+import { getPartDetails, getQuestionsByPart, createQuestionGroup, createStandaloneQuestion, Part, QuestionGroup, Question } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
 
@@ -39,10 +39,15 @@ export default function EditPartPage() {
   const fetchPart = async () => {
     if (!partId) return;
     try {
-      const res = await getPartDetails(partId);
-      setPart(res.data);
+      const [resPart, resQs] = await Promise.all([
+        getPartDetails(partId),
+        getQuestionsByPart(partId),
+      ]);
+      setPart(resPart.data);
+      setStandaloneQs(resQs.data || []);
       // Automatically increment orders based on existing lengths
-      setGroupOrder((res.data.questionGroups?.length ?? 0) + 1);
+      setGroupOrder((resPart.data.questionGroups?.length ?? 0) + 1);
+      setQOrder((resQs.data?.length ?? 0) + 1);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Failed to load part details.");
@@ -156,6 +161,7 @@ export default function EditPartPage() {
         {/* Left Side: Existing Groups & Standalone Questions */}
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Question Groups */}
+          {part.type === "group" && (
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 16px" }}>Question Groups</h2>
 
@@ -187,11 +193,165 @@ export default function EditPartPage() {
               </div>
             )}
           </div>
+          )}
+
+          {/* Standalone Questions */}
+          {part.type === "standalone" && (
+          <div style={{ marginTop: part.type === "standalone" ? 0 : 32 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 16px" }}>Standalone Questions</h2>
+
+            {standaloneQs.length === 0 ? (
+              <div className="card" style={{ textAlign: "center", padding: "32px 20px", color: "var(--text-muted)" }}>
+                <p style={{ margin: 0 }}>No standalone questions inside this part yet.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {standaloneQs.map((q) => (
+                  <div key={q.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={orderBadge}>{q.questionOrder}</span>
+                        <span className="badge badge-gray" style={{ fontSize: 10 }}>{q.type}</span>
+                        <span className="badge badge-purple" style={{ fontSize: 10 }}>{q.score} pts</span>
+                      </div>
+                      <Link href={`/edit-question/${q.id}`} className="btn btn-ghost btn-sm">
+                        ✏️ Edit
+                      </Link>
+                    </div>
+
+                    <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{q.content}</p>
+
+                    {q.options && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                        {Object.entries(q.options).map(([key, val]) => (
+                          <div
+                            key={key}
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 6,
+                              background: "rgba(255,255,255,0.02)",
+                              border: `1px solid ${q.correctOption?.key === key ? "var(--success)" : "var(--border)"}`,
+                              fontSize: 13,
+                              color: q.correctOption?.key === key ? "#fff" : "var(--text-secondary)",
+                            }}
+                          >
+                            <strong>{key}:</strong> {val}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          )}
         </div>
 
         {/* Right Side: Create Forms */}
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {/* Create Standalone Question Form */}
+          {part.type === "standalone" && (
+          <div className="card">
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 14px" }}>➕ Create Standalone Question</h2>
+            <form onSubmit={handleCreateStandaloneQ} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="field">
+                <label htmlFor="qOrder">Question Order</label>
+                <input
+                  id="qOrder"
+                  type="number"
+                  required
+                  min={1}
+                  className="input"
+                  value={qOrder}
+                  onChange={(e) => setQOrder(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="qContent">Question Text</label>
+                <input
+                  id="qContent"
+                  type="text"
+                  required
+                  className="input"
+                  placeholder="e.g. What is the speaker's main concern?"
+                  value={qContent}
+                  onChange={(e) => setQContent(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label>Options</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {["A", "B", "C", "D"].map((key) => {
+                    const val = key === "A" ? optionA : key === "B" ? optionB : key === "C" ? optionC : optionD;
+                    const setVal = key === "A" ? setOptionA : key === "B" ? setOptionB : key === "C" ? setOptionC : setOptionD;
+                    return (
+                      <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-secondary)", width: 16 }}>{key}</span>
+                        <input
+                          type="text"
+                          required
+                          className="input"
+                          placeholder={`Option ${key} text`}
+                          value={val}
+                          onChange={(e) => setVal(e.target.value)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="field">
+                  <label htmlFor="correctKey">Correct Option</label>
+                  <select id="correctKey" className="input" value={correctKey} onChange={(e) => setCorrectKey(e.target.value)}>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="qScore">Score Points</label>
+                  <input
+                    id="qScore"
+                    type="number"
+                    required
+                    min={1}
+                    className="input"
+                    value={qScore}
+                    onChange={(e) => setQScore(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="field">
+                <label htmlFor="qEx">Explanation (optional)</label>
+                <textarea
+                  id="qEx"
+                  className="input"
+                  rows={2}
+                  placeholder="Why is this option correct?"
+                  value={qExplanation}
+                  onChange={(e) => setQExplanation(e.target.value)}
+                />
+              </div>
+
+              {qError && <div className="alert alert-error">{qError}</div>}
+
+              <button type="submit" disabled={creatingQ} className="btn btn-primary btn-sm">
+                {creatingQ ? "Adding..." : "Add Question"}
+              </button>
+            </form>
+          </div>
+          )}
+
           {/* Create Group Form */}
+          {part.type === "group" && (
           <div className="card">
             <h2 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 14px" }}>➕ Create Question Group</h2>
             <form onSubmit={handleCreateGroup} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -249,6 +409,7 @@ export default function EditPartPage() {
               </button>
             </form>
           </div>
+          )}
         </div>
       </div>
     </div>

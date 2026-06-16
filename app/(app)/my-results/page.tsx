@@ -63,7 +63,6 @@ export default function MyResultsPage() {
                 <th style={thStyle}>Status</th>
                 <th style={thStyle}>Score</th>
                 <th style={thStyle}>Accuracy</th>
-                <th style={thStyle}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -100,11 +99,6 @@ export default function MyResultsPage() {
                           <div style={{ width: `${pct}%`, height: "100%", background: pct >= 70 ? "var(--success)" : pct >= 40 ? "var(--warning)" : "var(--error)" }} />
                         </div>
                       </div>
-                    </td>
-                    <td style={tdStyle}>
-                      <Link href={`/results/${s.id}`} className="btn btn-ghost btn-sm" style={{ padding: "6px 12px" }}>
-                        Review
-                      </Link>
                     </td>
                   </tr>
                 );

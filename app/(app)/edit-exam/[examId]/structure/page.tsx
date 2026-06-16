@@ -16,7 +16,7 @@ export default function EditExamStructurePage() {
 
   // New Part Form State
   const [partName, setPartName] = useState("");
-  const [partType, setPartType] = useState("listening");
+  const [partType, setPartType] = useState("group");
   const [partOrder, setPartOrder] = useState(1);
   const [instruction, setInstruction] = useState("");
   const [partScore, setPartScore] = useState(10);
@@ -165,10 +165,8 @@ export default function EditExamStructurePage() {
               <div className="field">
                 <label htmlFor="pType">Type</label>
                 <select id="pType" className="input" value={partType} onChange={(e) => setPartType(e.target.value)}>
-                  <option value="listening">Listening</option>
-                  <option value="reading">Reading</option>
-                  <option value="writing">Writing</option>
-                  <option value="speaking">Speaking</option>
+                  <option value="group">Group Part (contains shared passages/audio)</option>
+                  <option value="standalone">Standalone Part (contains independent questions)</option>
                 </select>
               </div>
 

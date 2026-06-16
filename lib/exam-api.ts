@@ -270,6 +270,22 @@ export const getQuestionsByPart = (partId: string) =>
 export const getQuestionById = (id: string) =>
   authed<{ data: Question; message: string; status: number }>(`/exam/question/${id}`);
 
+export const updateQuestion = (
+  id: string,
+  body: {
+    content?: string;
+    explanation?: string;
+    options?: Record<string, string>;
+    correctOption?: { key: string };
+    score?: number;
+    questionOrder?: number;
+  }
+) =>
+  authed<{ data: Question; message: string; status: number }>(
+    `/exam/question/${id}`,
+    { method: "PATCH", body: JSON.stringify(body) }
+  );
+
 // ─── Sessions ────────────────────────────────────────────────────────────────
 
 export const createSession = (examId: string, timeLimit?: number) =>

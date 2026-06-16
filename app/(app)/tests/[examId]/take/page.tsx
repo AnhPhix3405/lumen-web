@@ -158,7 +158,7 @@ export default function TakeExamPage() {
       await finishSession(sessionId);
 
       // 3. Redirect to results review
-      router.push(`/results/${sessionId}`);
+      router.push(`/my-results`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError("Failed to submit and finish exam.");
