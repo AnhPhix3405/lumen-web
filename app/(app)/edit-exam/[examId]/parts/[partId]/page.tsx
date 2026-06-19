@@ -220,6 +220,26 @@ export default function EditPartPage() {
 
                       <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{q.content}</p>
 
+                      {/* Audio */}
+                      {q.audioUrl && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>🎧 Audio</span>
+                          <audio src={q.audioUrl} controls style={{ width: "100%", height: 36 }} />
+                        </div>
+                      )}
+
+                      {/* Image */}
+                      {q.imageUrl && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>🖼️ Image</span>
+                          <img
+                            src={q.imageUrl}
+                            alt={`Question ${q.questionOrder} image`}
+                            style={{ maxWidth: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 8, border: "1px solid var(--border)" }}
+                          />
+                        </div>
+                      )}
+
                       {q.options && (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
                           {Object.entries(q.options).map(([key, val]) => (

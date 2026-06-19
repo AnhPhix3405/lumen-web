@@ -233,6 +233,26 @@ export default function TakeExamPage() {
             <p style={{ fontSize: 15, fontWeight: 500, margin: "0 0 14px", color: "var(--text-primary)" }}>
               {q.content}
             </p>
+
+            {/* Audio */}
+            {q.audioUrl && (
+              <div style={{ ...styles.audioWrapper, marginBottom: 14 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>🎧 Audio:</span>
+                <audio src={q.audioUrl} controls style={{ width: "100%", marginTop: 8 }} />
+              </div>
+            )}
+
+            {/* Image */}
+            {q.imageUrl && (
+              <div style={{ marginBottom: 14 }}>
+                <img
+                  src={q.imageUrl}
+                  alt={`Question ${q.questionOrder}`}
+                  style={{ maxWidth: "100%", maxHeight: 280, objectFit: "contain", borderRadius: 10, border: "1px solid var(--border)" }}
+                />
+              </div>
+            )}
+
             {q.options ? (
               <div style={styles.optionsList}>
                 {Object.entries(q.options).map(([key, val]) => {
