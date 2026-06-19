@@ -392,6 +392,16 @@ Returns a single part with its question groups and questions.
           }
         ]
       }
+    ],
+    "questions": [
+      {
+        "id": "uuid",
+        "type": "separate",
+        "content": "What is the sum of 2 and 3?",
+        "options": { "A": "4", "B": "5", "C": "6", "D": "7" },
+        "score": 1,
+        "questionOrder": 1
+      }
     ]
   },
   "message": "Part fetched successfully",
@@ -714,6 +724,54 @@ Updates an existing question's fields. The `questionId` comes from the URL path 
 
 ---
 
+## Upload Question Audio
+
+Uploads an audio file for a question. This endpoint uses `multipart/form-data` (no JSON).
+
+**Endpoint:** `PATCH /exam/question/:questionId/upload-audio`
+
+**Request Body:** `multipart/form-data`
+
+| Field  | Type | Description       |
+|--------|------|-------------------|
+| `file` | File | Audio file (MP3, etc.) |
+
+**Response `200`:**
+
+```json
+{
+  "data": "https://cdn.example.com/audio/uuid.mp3",
+  "message": "Question audio uploaded successfully",
+  "status": 200
+}
+```
+
+---
+
+## Upload Question Image
+
+Uploads an image file for a question. This endpoint uses `multipart/form-data` (no JSON).
+
+**Endpoint:** `PATCH /exam/question/:questionId/upload-image`
+
+**Request Body:** `multipart/form-data`
+
+| Field  | Type | Description       |
+|--------|------|-------------------|
+| `file` | File | Image file (JPEG, PNG, etc.) |
+
+**Response `200`:**
+
+```json
+{
+  "data": "https://cdn.example.com/images/uuid.jpg",
+  "message": "Question image uploaded successfully",
+  "status": 200
+}
+```
+
+---
+
 ## Create Separate Question in Part
 
 Creates a standalone question directly in a part (not inside a group). This endpoint requires the part's `type` to be `"standalone"` — it **cannot** be called on a part whose type is `"group"`.
@@ -970,6 +1028,8 @@ Finalizes an in-progress session: calculates scores, marks it completed, and ret
 | `/exam/question/by-part/:partId`                      | GET    | Standalone questions     |
 | `/exam/question/:id`                                  | GET    | Question by ID           |
 | `/exam/question/:questionId`                          | PATCH  | Update question          |
+| `/exam/question/:questionId/upload-audio`             | PATCH  | `multipart/form-data`    |
+| `/exam/question/:questionId/upload-image`             | PATCH  | `multipart/form-data`    |
 | `/exam/part/:partId/question`                         | POST   | Create standalone question|
 | `/exam/create-session/:examId`                        | POST   | Start session            |
 | `/exam/session/:sessionId`                            | GET    | Session details          |

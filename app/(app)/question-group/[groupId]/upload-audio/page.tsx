@@ -11,7 +11,6 @@ export default function UploadAudioPage() {
 
   const [group, setGroup] = useState<QuestionGroup | null>(null);
   const [loadingGroup, setLoadingGroup] = useState(true);
-  const [userId, setUserId] = useState("12345678-1234-1234-1234-1234567890ab");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +51,7 @@ export default function UploadAudioPage() {
     setSuccessMsg(null);
 
     try {
-      const res = await uploadGroupAudio(groupId, file, userId);
+      const res = await uploadGroupAudio(groupId, file);
       setSuccessMsg(res.message);
       setFile(null); // Clear selected file
       
@@ -117,19 +116,6 @@ export default function UploadAudioPage() {
 
         {/* Upload Form */}
         <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="field">
-            <label htmlFor="userId">User ID (x-user-id Header)</label>
-            <input
-              id="userId"
-              type="text"
-              required
-              className="input"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              placeholder="Enter User UUID"
-            />
-          </div>
-
           <div className="field">
             <label htmlFor="audioFile">Select New Audio File (MP3, WAV, etc.)</label>
             <input

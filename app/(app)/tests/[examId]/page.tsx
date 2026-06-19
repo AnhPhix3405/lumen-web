@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getFullExam, FullExam } from "@/lib/exam-api";
+import { getExamSummary, getPartsByExam, ExamSummary, Part } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
 
 export default function ExamDetailPage() {
   const { examId } = useParams<{ examId: string }>();
   const router = useRouter();
-  const [exam, setExam] = useState<FullExam | null>(null);
+  const [exam, setExam] = useState<ExamSummary | null>(null);
+  const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,14 +18,23 @@ export default function ExamDetailPage() {
     if (!examId) return;
     let cancelled = false;
     setLoading(true);
-    getFullExam(examId)
-      .then((res) => { if (!cancelled) setExam(res.data); })
+
+    Promise.all([
+      getExamSummary(examId),
+      getPartsByExam(examId),
+    ])
+      .then(([examRes, partsRes]) => {
+        if (cancelled) return;
+        setExam(examRes);
+        setParts(partsRes.data ?? []);
+      })
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError) setError(err.message);
         else setError("Failed to load exam.");
       })
       .finally(() => { if (!cancelled) setLoading(false); });
+
     return () => { cancelled = true; };
   }, [examId]);
 
@@ -41,11 +51,6 @@ export default function ExamDetailPage() {
   );
 
   if (!exam) return null;
-
-  const totalQuestions = exam.parts?.reduce(
-    (acc, p) => acc + p.questionGroups?.reduce((a, g) => a + (g.questions?.length ?? 0), 0),
-    0
-  ) ?? 0;
 
   return (
     <div className="page-container" style={{ padding: "40px 24px", maxWidth: 860 }}>
@@ -70,8 +75,7 @@ export default function ExamDetailPage() {
           {[
             { icon: "⏱", label: "Duration", value: `${exam.durationMinutes} minutes` },
             { icon: "🎯", label: "Total Score", value: exam.totalScore },
-            { icon: "📋", label: "Parts", value: exam.parts?.length ?? 0 },
-            { icon: "❓", label: "Questions", value: totalQuestions },
+            { icon: "📋", label: "Parts", value: parts.length },
           ].map(({ icon, label, value }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 22 }}>{icon}</span>
@@ -88,37 +92,33 @@ export default function ExamDetailPage() {
         </Link>
       </div>
 
-      {exam.parts && exam.parts.length > 0 && (
+      {parts.length > 0 && (
         <section>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 16px" }}>Exam Structure</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[...exam.parts].sort((a, b) => a.partOrder - b.partOrder).map((part) => {
-              const qCount = part.questionGroups?.reduce((a, g) => a + (g.questions?.length ?? 0), 0) ?? 0;
-              return (
-                <div key={part.id} className="card" style={{ padding: "16px 20px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                        <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(99,102,241,0.2)", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>
-                          {part.partOrder}
-                        </span>
-                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{part.name}</h3>
-                        <span className="badge badge-gray" style={{ fontSize: 10 }}>{part.type}</span>
-                      </div>
-                      {part.instruction && (
-                        <p style={{ margin: "0 0 0 38px", fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
-                          {part.instruction}
-                        </p>
-                      )}
+            {[...parts].sort((a, b) => a.partOrder - b.partOrder).map((part) => (
+              <div key={part.id} className="card" style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                      <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(99,102,241,0.2)", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>
+                        {part.partOrder}
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{part.name}</h3>
+                      <span className="badge badge-gray" style={{ fontSize: 10 }}>{part.type}</span>
                     </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{qCount} Qs</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{part.score} pts</div>
-                    </div>
+                    {part.instruction && (
+                      <p style={{ margin: "0 0 0 38px", fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
+                        {part.instruction}
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{part.score} pts</div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </section>
       )}

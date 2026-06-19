@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getQuestionById, updateQuestion, Question } from "@/lib/exam-api";
+import { getQuestionById, updateQuestion, uploadQuestionAudio, uploadQuestionImage, Question } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
 
@@ -27,6 +27,14 @@ export default function EditQuestionPage() {
 
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Media States
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [mediaSuccess, setMediaSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!questionId) return;
@@ -84,6 +92,48 @@ export default function EditQuestionPage() {
       else setError("Failed to update question.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAudioUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!questionId || !audioFile) return;
+    setUploadingAudio(true);
+    setMediaError(null);
+    setMediaSuccess(null);
+
+    try {
+      const res = await uploadQuestionAudio(questionId, audioFile);
+      setMediaSuccess(res.message);
+      setAudioFile(null);
+      if (question) setQuestion({ ...question, audioUrl: res.data });
+      setTimeout(() => setMediaSuccess(null), 3000);
+    } catch (err) {
+      if (err instanceof ApiError) setMediaError(err.message);
+      else setMediaError("Failed to upload audio.");
+    } finally {
+      setUploadingAudio(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!questionId || !imageFile) return;
+    setUploadingImage(true);
+    setMediaError(null);
+    setMediaSuccess(null);
+
+    try {
+      const res = await uploadQuestionImage(questionId, imageFile);
+      setMediaSuccess(res.message);
+      setImageFile(null);
+      if (question) setQuestion({ ...question, imageUrl: res.data });
+      setTimeout(() => setMediaSuccess(null), 3000);
+    } catch (err) {
+      if (err instanceof ApiError) setMediaError(err.message);
+      else setMediaError("Failed to upload image.");
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -211,6 +261,66 @@ export default function EditQuestionPage() {
             {saving ? "Saving Changes..." : "Save Changes"}
           </button>
         </form>
+      </div>
+
+      {/* Media Uploads Section */}
+      <div className="card fade-up" style={{ marginTop: 24 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 16px" }}>Media Uploads</h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          {/* Audio Upload */}
+          <div style={{ padding: 16, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>🎧 Audio</h3>
+            {question.audioUrl && (
+              <div style={{ marginBottom: 12 }}>
+                <audio src={question.audioUrl} controls style={{ width: "100%" }} key={question.audioUrl} />
+                <div style={{ fontSize: 12, color: "var(--success)", wordBreak: "break-all", marginTop: 4 }}>
+                  URL: <a href={question.audioUrl} target="_blank" rel="noreferrer" style={{ color: "#a5b4fc" }}>{question.audioUrl}</a>
+                </div>
+              </div>
+            )}
+            <form onSubmit={handleAudioUpload} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input
+                type="file"
+                accept="audio/*"
+                required
+                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                style={{ fontSize: 13, color: "var(--text-secondary)" }}
+              />
+              <button type="submit" disabled={uploadingAudio || !audioFile} className="btn btn-primary btn-sm">
+                {uploadingAudio ? "Uploading..." : "Upload Audio"}
+              </button>
+            </form>
+          </div>
+
+          {/* Image Upload */}
+          <div style={{ padding: 16, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>🖼️ Image</h3>
+            {question.imageUrl && (
+              <div style={{ marginBottom: 12 }}>
+                <img src={question.imageUrl} alt="Question Image" style={{ width: "100%", borderRadius: 8, objectFit: "contain", maxHeight: 150 }} />
+                <div style={{ fontSize: 12, color: "var(--success)", wordBreak: "break-all", marginTop: 4 }}>
+                  URL: <a href={question.imageUrl} target="_blank" rel="noreferrer" style={{ color: "#a5b4fc" }}>{question.imageUrl}</a>
+                </div>
+              </div>
+            )}
+            <form onSubmit={handleImageUpload} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input
+                type="file"
+                accept="image/*"
+                required
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                style={{ fontSize: 13, color: "var(--text-secondary)" }}
+              />
+              <button type="submit" disabled={uploadingImage || !imageFile} className="btn btn-primary btn-sm">
+                {uploadingImage ? "Uploading..." : "Upload Image"}
+              </button>
+            </form>
+          </div>
+        </div>
+        
+        {mediaError && <div className="alert alert-error" style={{ marginTop: 16 }}>{mediaError}</div>}
+        {mediaSuccess && <div className="alert alert-success" style={{ marginTop: 16 }}>✅ {mediaSuccess}</div>}
       </div>
     </div>
   );

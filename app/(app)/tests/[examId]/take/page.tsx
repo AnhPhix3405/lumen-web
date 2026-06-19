@@ -2,7 +2,17 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getFullExam, createSession, submitAnswers, finishSession, FullExam, Question } from "@/lib/exam-api";
+import {
+  getExamSummary,
+  getPartsByExam,
+  getPartDetails,
+  createSession,
+  submitAnswers,
+  finishSession,
+  ExamSummary,
+  Part,
+  Question,
+} from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 
 interface UserAnswersState {
@@ -16,18 +26,22 @@ export default function TakeExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const router = useRouter();
 
-  const [exam, setExam] = useState<FullExam | null>(null);
+  const [exam, setExam] = useState<ExamSummary | null>(null);
+  const [parts, setParts] = useState<Part[]>([]);
+  const [partDetails, setPartDetails] = useState<Record<string, Part>>({});
+  const [loadingPart, setLoadingPart] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active navigation
   const [activePartIndex, setActivePartIndex] = useState<number>(0);
   const [userAnswers, setUserAnswers] = useState<UserAnswersState>({});
   const [saving, setSaving] = useState(false);
 
-  // Load Exam and Session
+  const loadingPartRef = useRef<string | null>(null);
+
+  // Load exam metadata + parts list + session on mount
   useEffect(() => {
     if (!examId) return;
     let cancelled = false;
@@ -35,16 +49,27 @@ export default function TakeExamPage() {
     const init = async () => {
       try {
         setLoading(true);
-        // Get full exam structure first
-        const examRes = await getFullExam(examId);
+
+        const [summary, partsRes] = await Promise.all([
+          getExamSummary(examId),
+          getPartsByExam(examId),
+        ]);
         if (cancelled) return;
-        setExam(examRes.data);
+
+        if (!summary) {
+          setError("Exam not found.");
+          return;
+        }
+
+        setExam(summary);
+        const sorted = (partsRes.data ?? []).sort((a, b) => a.partOrder - b.partOrder);
+        setParts(sorted);
 
         // Create a new session
         const sessionRes = await createSession(examId);
         if (cancelled) return;
         setSessionId(sessionRes.data.sessionId || null);
-        setTimeLeft(sessionRes.data.timeLimitSeconds || (examRes.data.durationMinutes * 60));
+        setTimeLeft(sessionRes.data.timeLimitSeconds || (summary.durationMinutes * 60));
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError) setError(err.message);
@@ -55,11 +80,35 @@ export default function TakeExamPage() {
     };
 
     init();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [examId]);
+
+  // Load active part content when part changes
+  useEffect(() => {
+    const part = parts[activePartIndex];
+    if (!part) return;
+    if (partDetails[part.id]) return; // already loaded
+    if (loadingPartRef.current === part.id) return; // already loading
+
+    loadingPartRef.current = part.id;
+    setLoadingPart(part.id);
+
+    getPartDetails(part.id)
+      .then((res) => {
+        if (loadingPartRef.current === part.id) {
+          setPartDetails((prev) => ({ ...prev, [part.id]: res.data }));
+          setLoadingPart(null);
+          loadingPartRef.current = null;
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load part content:", err);
+        if (loadingPartRef.current === part.id) {
+          setLoadingPart(null);
+          loadingPartRef.current = null;
+        }
+      });
+  }, [activePartIndex, parts, partDetails]);
 
   // Countdown timer
   useEffect(() => {
@@ -69,7 +118,6 @@ export default function TakeExamPage() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Auto submit when time runs out
           handleFinish(true);
           return 0;
         }
@@ -78,45 +126,29 @@ export default function TakeExamPage() {
     }, 1000);
 
     return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, error, timeLeft, sessionId]);
 
-  // Submit single answer helper
   const handleSelectOption = (questionId: string, optionKey: string) => {
     setUserAnswers((prev) => {
       const updated = {
         ...prev,
-        [questionId]: {
-          selectedOption: { key: optionKey },
-        },
+        [questionId]: { selectedOption: { key: optionKey } },
       };
-
-      // Auto-submit in background to save progress
       if (sessionId) {
         submitAnswers(sessionId, [
-          {
-            questionId,
-            selectedOption: { key: optionKey },
-          },
+          { questionId, selectedOption: { key: optionKey } },
         ]).catch((err) => console.error("Error saving progress:", err));
       }
-
       return updated;
     });
   };
 
   const handleTextChange = (questionId: string, text: string) => {
-    setUserAnswers((prev) => {
-      const updated = {
-        ...prev,
-        [questionId]: {
-          answerContent: text,
-        },
-      };
-
-      // Debounce saving in real production, but here we just update state,
-      // and we will save everything when they change parts or finish.
-      return updated;
-    });
+    setUserAnswers((prev) => ({
+      ...prev,
+      [questionId]: { answerContent: text },
+    }));
   };
 
   const savePartProgress = async () => {
@@ -144,7 +176,6 @@ export default function TakeExamPage() {
 
     setLoading(true);
     try {
-      // 1. Submit all current answers one last time
       const answersArray = Object.entries(userAnswers).map(([qId, ans]) => ({
         questionId: qId,
         selectedOption: ans.selectedOption,
@@ -153,11 +184,7 @@ export default function TakeExamPage() {
       if (answersArray.length > 0) {
         await submitAnswers(sessionId, answersArray);
       }
-
-      // 2. Finish the session
       await finishSession(sessionId);
-
-      // 3. Redirect to results review
       router.push(`/my-results`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -188,32 +215,74 @@ export default function TakeExamPage() {
 
   if (!exam) return null;
 
-  const parts = [...(exam.parts || [])].sort((a, b) => a.partOrder - b.partOrder);
-  const activePart = parts[activePartIndex];
+  const activePart = partDetails[parts[activePartIndex]?.id] ?? parts[activePartIndex];
 
-  // Format time (MM:SS)
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const s = secs % 60;
     return `${mins.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const renderQuestion = (q: Question) => {
+    const ans = userAnswers[q.id];
+    return (
+      <div key={q.id} style={styles.questionBlock}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <span style={styles.qNumber}>{q.questionOrder}</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 15, fontWeight: 500, margin: "0 0 14px", color: "var(--text-primary)" }}>
+              {q.content}
+            </p>
+            {q.options ? (
+              <div style={styles.optionsList}>
+                {Object.entries(q.options).map(([key, val]) => {
+                  const isSelected = ans?.selectedOption?.key === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleSelectOption(q.id, key)}
+                      style={{
+                        ...styles.optionBtn,
+                        ...(isSelected ? styles.optionBtnSelected : {}),
+                      }}
+                    >
+                      <span style={{
+                        ...styles.optionBadge,
+                        ...(isSelected ? styles.optionBadgeActive : {}),
+                      }}>{key}</span>
+                      <span style={{ fontSize: 14 }}>{val}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <input
+                type="text"
+                placeholder="Type your response here..."
+                className="input"
+                value={ans?.answerContent || ""}
+                onChange={(e) => handleTextChange(q.id, e.target.value)}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={styles.wrapper}>
-      {/* Full screen header bar */}
       <header style={styles.header}>
         <div>
           <h1 style={styles.headerTitle}>{exam.name}</h1>
-          <span className="badge badge-purple" style={{ fontSize: 11 }}>{exam.examType?.name}</span>
+          {exam.examType && <span className="badge badge-purple" style={{ fontSize: 11 }}>{exam.examType.name}</span>}
         </div>
 
-        {/* Timer */}
         <div style={{ ...styles.timer, color: timeLeft < 300 ? "var(--error)" : "var(--warning)" }}>
           <span style={{ fontSize: 20 }}>⏱</span>
           <span>{formatTime(timeLeft)}</span>
         </div>
 
-        {/* Action Button */}
         <div>
           <button onClick={() => handleFinish(false)} className="btn btn-primary btn-sm">
             Submit Exam
@@ -221,18 +290,18 @@ export default function TakeExamPage() {
         </div>
       </header>
 
-      {/* Main workspace */}
       <div style={styles.workspace}>
-        {/* Left sidebar - Question outline / parts */}
         <aside style={styles.sidebar}>
           <h2 style={styles.sidebarHeading}>Parts</h2>
           <div style={styles.partList}>
             {parts.map((p, idx) => {
               const isActive = idx === activePartIndex;
+              const isLoading = loadingPart === p.id;
               return (
                 <button
                   key={p.id}
                   onClick={async () => {
+                    if (idx === activePartIndex) return;
                     await savePartProgress();
                     setActivePartIndex(idx);
                   }}
@@ -243,7 +312,10 @@ export default function TakeExamPage() {
                 >
                   <span style={styles.partBtnNum}>{p.partOrder}</span>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      {p.name}
+                      {isLoading && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--text-muted)" }}>loading...</span>}
+                    </div>
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{p.type}</div>
                   </div>
                 </button>
@@ -258,11 +330,14 @@ export default function TakeExamPage() {
           </div>
         </aside>
 
-        {/* Right content - Active Part */}
         <main style={styles.content}>
-          {activePart ? (
+          {loadingPart === parts[activePartIndex]?.id ? (
+            <div style={{ textAlign: "center", padding: 80, color: "var(--text-muted)" }}>
+              <div className="spinner" />
+              <p style={{ marginTop: 16 }}>Loading part content...</p>
+            </div>
+          ) : activePart ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 28 }} className="fade-up">
-              {/* Part instruction */}
               <div className="card" style={{ background: "rgba(255,255,255,0.02)" }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>{activePart.name}</h2>
                 {activePart.instruction && (
@@ -272,80 +347,26 @@ export default function TakeExamPage() {
                 )}
               </div>
 
-              {/* Question groups in part */}
-              {activePart.questionGroups?.map((group) => {
-                return (
-                  <div key={group.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                    {/* Audio Player if URL exists */}
-                    {group.audioUrl && (
-                      <div style={styles.audioWrapper}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>🎧 Section Audio:</span>
-                        <audio src={group.audioUrl} controls style={{ width: "100%", marginTop: 8 }} />
-                      </div>
-                    )}
-
-                    {/* Shared Content / Reading Passage */}
-                    {group.content && (
-                      <div style={styles.passageContent}>
-                        {group.content}
-                      </div>
-                    )}
-
-                    {/* Questions */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 12 }}>
-                      {group.questions?.map((q) => {
-                        const ans = userAnswers[q.id];
-                        return (
-                          <div key={q.id} style={styles.questionBlock}>
-                            <div style={{ display: "flex", gap: 10 }}>
-                              <span style={styles.qNumber}>{q.questionOrder}</span>
-                              <div style={{ flex: 1 }}>
-                                <p style={{ fontSize: 15, fontWeight: 500, margin: "0 0 14px", color: "var(--text-primary)" }}>
-                                  {q.content}
-                                </p>
-
-                                {/* Multiple choice options */}
-                                {q.options ? (
-                                  <div style={styles.optionsList}>
-                                    {Object.entries(q.options).map(([key, val]) => {
-                                      const isSelected = ans?.selectedOption?.key === key;
-                                      return (
-                                        <button
-                                          key={key}
-                                          onClick={() => handleSelectOption(q.id, key)}
-                                          style={{
-                                            ...styles.optionBtn,
-                                            ...(isSelected ? styles.optionBtnSelected : {}),
-                                          }}
-                                        >
-                                          <span style={{
-                                            ...styles.optionBadge,
-                                            ...(isSelected ? styles.optionBadgeActive : {}),
-                                          }}>{key}</span>
-                                          <span style={{ fontSize: 14 }}>{val}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  /* Text response inputs */
-                                  <input
-                                    type="text"
-                                    placeholder="Type your response here..."
-                                    className="input"
-                                    value={ans?.answerContent || ""}
-                                    onChange={(e) => handleTextChange(q.id, e.target.value)}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+              {/* Question groups (for group-type parts) */}
+              {activePart.questionGroups?.map((group) => (
+                <div key={group.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                  {group.audioUrl && (
+                    <div style={styles.audioWrapper}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>🎧 Section Audio:</span>
+                      <audio src={group.audioUrl} controls style={{ width: "100%", marginTop: 8 }} />
                     </div>
+                  )}
+                  {group.content && (
+                    <div style={styles.passageContent}>{group.content}</div>
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 12 }}>
+                    {group.questions?.map(renderQuestion)}
                   </div>
-                );
-              })}
+                </div>
+              ))}
+
+              {/* Standalone questions (for standalone-type parts) */}
+              {activePart.questions?.map(renderQuestion)}
 
               {/* Navigation buttons */}
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
@@ -353,7 +374,7 @@ export default function TakeExamPage() {
                   disabled={activePartIndex === 0}
                   onClick={async () => {
                     await savePartProgress();
-                    setActivePartIndex(p => p - 1);
+                    setActivePartIndex((p) => p - 1);
                   }}
                   className="btn btn-ghost"
                 >
@@ -363,7 +384,7 @@ export default function TakeExamPage() {
                   <button
                     onClick={async () => {
                       await savePartProgress();
-                      setActivePartIndex(p => p + 1);
+                      setActivePartIndex((p) => p + 1);
                     }}
                     className="btn btn-primary"
                   >

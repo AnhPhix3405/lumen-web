@@ -57,6 +57,8 @@ export interface Question {
   questionOrder: number;
   questionGroupId?: string;
   partId?: string;
+  audioUrl?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface QuestionGroup {
@@ -79,6 +81,7 @@ export interface Part {
   instruction?: string;
   score: number;
   questionGroups: QuestionGroup[];
+  questions?: Question[];
 }
 
 export interface FullExam extends ExamSummary {
@@ -131,6 +134,21 @@ export const getFullExam = (examId: string) =>
 
 export const getMyExams = () =>
   authed<{ data: ExamSummary[]; message: string; status: number }>("/exam/my");
+
+/** Lightweight exam metadata — avoids the full exam tree endpoint. */
+export const getExamSummary = async (examId: string): Promise<ExamSummary | null> => {
+  try {
+    const published = await listPublishedExams();
+    const found = published.data.find((e) => e.id === examId);
+    if (found) return found;
+  } catch { /* fall through */ }
+  try {
+    const mine = await getMyExams();
+    const found = mine.data.find((e) => e.id === examId);
+    if (found) return found;
+  } catch { /* fall through */ }
+  return null;
+};
 
 export const createExam = (body: {
   name: string;
@@ -210,14 +228,13 @@ export const getQuestionGroupsByPart = (partId: string) =>
 export const getQuestionGroup = (id: string) =>
   authed<{ data: QuestionGroup; message: string; status: number }>(`/exam/question-group/${id}`);
 
-export const uploadGroupAudio = (questionGroupId: string, file: File, userId: string) => {
+export const uploadGroupAudio = (questionGroupId: string, file: File) => {
   const form = new FormData();
   form.append("file", file);
   return authedFormData<{ data: { id: string; audioUrl: string }; message: string; status: number }>(
     `/exam/question-group/${questionGroupId}/upload-audio`,
     {
       method: "PATCH",
-      headers: { "x-user-id": userId },
       body: form,
     }
   );
@@ -285,6 +302,30 @@ export const updateQuestion = (
     `/exam/question/${id}`,
     { method: "PATCH", body: JSON.stringify(body) }
   );
+
+export const uploadQuestionAudio = (questionId: string, file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return authedFormData<{ data: string; message: string; status: number }>(
+    `/exam/question/${questionId}/upload-audio`,
+    {
+      method: "PATCH",
+      body: form,
+    }
+  );
+};
+
+export const uploadQuestionImage = (questionId: string, file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return authedFormData<{ data: string; message: string; status: number }>(
+    `/exam/question/${questionId}/upload-image`,
+    {
+      method: "PATCH",
+      body: form,
+    }
+  );
+};
 
 // ─── Sessions ────────────────────────────────────────────────────────────────
 

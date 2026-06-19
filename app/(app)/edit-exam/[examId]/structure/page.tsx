@@ -119,7 +119,9 @@ export default function EditExamStructurePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }} className="fade-up">
               {sortedParts.map((part) => {
                 const groupCount = part.questionGroups?.length ?? 0;
-                const totalQs = part.questionGroups?.reduce((a, g) => a + (g.questions?.length ?? 0), 0) ?? 0;
+                const groupQs = part.questionGroups?.reduce((a, g) => a + (g.questions?.length ?? 0), 0) ?? 0;
+                const standaloneQs = part.questions?.length ?? 0;
+                const totalQs = groupQs + standaloneQs;
 
                 return (
                   <div key={part.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -130,7 +132,10 @@ export default function EditExamStructurePage() {
                         <span className="badge badge-purple" style={{ fontSize: 10 }}>{part.type}</span>
                       </div>
                       <p style={{ margin: "0 0 0 34px", fontSize: 13, color: "var(--text-secondary)" }}>
-                        {groupCount} groups • {totalQs} questions • {part.score} max score
+                        {part.type === "standalone"
+                          ? `${totalQs} questions • ${part.score} max score`
+                          : `${groupCount} groups • ${totalQs} questions • ${part.score} max score`
+                        }
                       </p>
                     </div>
 
