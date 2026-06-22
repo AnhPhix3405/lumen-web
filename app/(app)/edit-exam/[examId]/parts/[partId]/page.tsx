@@ -86,19 +86,23 @@ export default function EditPartPage() {
   const handleCreateStandaloneQ = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partId) return;
+
+    if (correctKey === "D" && optionD === "") {
+      setQError("Option D cannot be the correct answer if it is left empty.");
+      return;
+    }
+
     setCreatingQ(true);
     setQError(null);
 
     try {
+      const builtOptions: Record<string, string> = { A: optionA, B: optionB, C: optionC };
+      if (optionD !== "") builtOptions.D = optionD;
+
       await createStandaloneQuestion(partId, {
         content: qContent,
         explanation: qExplanation || undefined,
-        options: {
-          A: optionA,
-          B: optionB,
-          C: optionC,
-          D: optionD,
-        },
+        options: builtOptions,
         correctOption: { key: correctKey },
         score: qScore,
         questionOrder: qOrder,
@@ -177,7 +181,7 @@ export default function EditPartPage() {
                           <span style={orderBadge}>{group.groupOrder}</span>
                           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Group #{group.groupOrder}</h3>
                           <span className="badge badge-gray" style={{ fontSize: 10 }}>{group.type}</span>
-                          {group.audioUrl && <span style={{ fontSize: 14 }}>🎧</span>}
+                          {group.audioUrl && group.audioUrl !== "null" && <span style={{ fontSize: 14 }}>🎧</span>}
                         </div>
                         <p style={{ margin: "0 0 0 34px", fontSize: 13, color: "var(--text-secondary)", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                           {group.content || "No text content."}
@@ -221,7 +225,7 @@ export default function EditPartPage() {
                       <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{q.content}</p>
 
                       {/* Audio */}
-                      {q.audioUrl && (
+                      {q.audioUrl && q.audioUrl !== "null" && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>🎧 Audio</span>
                           <audio src={q.audioUrl} controls style={{ width: "100%", height: 36 }} />
@@ -229,7 +233,7 @@ export default function EditPartPage() {
                       )}
 
                       {/* Image */}
-                      {q.imageUrl && (
+                      {q.imageUrl && q.imageUrl !== "null" && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>🖼️ Image</span>
                           <img
@@ -312,7 +316,8 @@ export default function EditPartPage() {
                           <input
                             type="text"
                             className="input"
-                            placeholder={`Option ${key} text`}
+                            required={key !== "D"}
+                            placeholder={key === "D" ? `Option D (leave empty for 3 options)` : `Option ${key} text`}
                             value={val}
                             onChange={(e) => setVal(e.target.value)}
                           />

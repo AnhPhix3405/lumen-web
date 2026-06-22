@@ -14,6 +14,7 @@ import {
   Question,
 } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
+import ReactMarkdown from "react-markdown";
 
 interface UserAnswersState {
   [questionId: string]: {
@@ -235,7 +236,7 @@ export default function TakeExamPage() {
             </p>
 
             {/* Audio */}
-            {q.audioUrl && (
+            {q.audioUrl && q.audioUrl !== "null" && (
               <div style={{ ...styles.audioWrapper, marginBottom: 14 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>🎧 Audio:</span>
                 <audio src={q.audioUrl} controls style={{ width: "100%", marginTop: 8 }} />
@@ -243,7 +244,7 @@ export default function TakeExamPage() {
             )}
 
             {/* Image */}
-            {q.imageUrl && (
+            {q.imageUrl && q.imageUrl !== "null" && (
               <div style={{ marginBottom: 14 }}>
                 <img
                   src={q.imageUrl}
@@ -370,14 +371,16 @@ export default function TakeExamPage() {
               {/* Question groups (for group-type parts) */}
               {activePart.questionGroups?.map((group) => (
                 <div key={group.id} className="card" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                  {group.audioUrl && (
+                  {group.audioUrl && group.audioUrl !== "null" && (
                     <div style={styles.audioWrapper}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>🎧 Section Audio:</span>
                       <audio src={group.audioUrl} controls style={{ width: "100%", marginTop: 8 }} />
                     </div>
                   )}
                   {group.content && (
-                    <div style={styles.passageContent}>{group.content}</div>
+                    <div style={styles.passageContent}>
+                      <ReactMarkdown>{group.content}</ReactMarkdown>
+                    </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 12 }}>
                     {group.questions?.map(renderQuestion)}

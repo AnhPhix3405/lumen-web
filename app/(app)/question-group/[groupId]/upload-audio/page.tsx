@@ -100,7 +100,7 @@ export default function UploadAudioPage() {
           <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", marginTop: 0, marginBottom: 12 }}>
             Current Audio Player
           </h3>
-          {group?.audioUrl ? (
+          {group?.audioUrl && group.audioUrl !== "null" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <audio src={group.audioUrl} controls style={{ width: "100%" }} key={group.audioUrl} />
               <div style={{ fontSize: 12, color: "var(--success)", wordBreak: "break-all" }}>

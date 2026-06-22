@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getQuestionGroup, createQuestionInGroup, QuestionGroup, Question } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 
 export default function EditQuestionGroupPage() {
   const { examId, partId, groupId } = useParams<{ examId: string; partId: string; groupId: string }>();
@@ -48,19 +49,23 @@ export default function EditQuestionGroupPage() {
   const handleCreateQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupId) return;
+
+    if (correctKey === "D" && optionD === "") {
+      setQError("Option D cannot be the correct answer if it is left empty.");
+      return;
+    }
+
     setCreatingQ(true);
     setQError(null);
 
     try {
+      const builtOptions: Record<string, string> = { A: optionA, B: optionB, C: optionC };
+      if (optionD !== "") builtOptions.D = optionD;
+
       await createQuestionInGroup(groupId, {
         content: qContent,
         explanation: qExplanation || undefined,
-        options: {
-          A: optionA,
-          B: optionB,
-          C: optionC,
-          D: optionD,
-        },
+        options: builtOptions,
         correctOption: { key: correctKey },
         score: qScore,
         questionOrder: qOrder,
@@ -135,9 +140,9 @@ export default function EditQuestionGroupPage() {
           <div className="card">
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Passage Content / Context</h2>
             <div style={{ background: "rgba(255,255,255,0.02)", padding: 16, borderRadius: 8, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-              {group.content || "(No context content provided)"}
+              {group.content ? <ReactMarkdown>{group.content}</ReactMarkdown> : "(No context content provided)"}
             </div>
-            {group.audioUrl && (
+            {group.audioUrl && group.audioUrl !== "null" && (
               <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>Active Audio File:</span>
                 <audio src={group.audioUrl} controls style={{ width: "100%" }} />
@@ -237,9 +242,9 @@ export default function EditQuestionGroupPage() {
                       <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-secondary)", width: 16 }}>{key}</span>
                       <input
                         type="text"
-                        required
+                        required={key !== "D"}
                         className="input"
-                        placeholder={`Option ${key} text`}
+                        placeholder={key === "D" ? `Option D (leave empty for 3 options)` : `Option ${key} text`}
                         value={val}
                         onChange={(e) => setVal(e.target.value)}
                       />

@@ -66,20 +66,24 @@ export default function EditQuestionPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionId) return;
+
+    if (correctKey === "D" && optionD === "") {
+      setError("Option D cannot be the correct answer if it is left empty.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccessMsg(null);
 
     try {
+      const builtOptions: Record<string, string> = { A: optionA, B: optionB, C: optionC };
+      if (optionD !== "") builtOptions.D = optionD;
+
       const res = await updateQuestion(questionId, {
         content: qContent,
         explanation: qExplanation || undefined,
-        options: {
-          A: optionA,
-          B: optionB,
-          C: optionC,
-          D: optionD,
-        },
+        options: builtOptions,
         correctOption: { key: correctKey },
         score: qScore,
         questionOrder: qOrder,
@@ -220,9 +224,9 @@ export default function EditQuestionPage() {
                     <span style={{ fontSize: 13, fontWeight: 700, color: isCorrect ? "var(--success)" : "var(--text-secondary)", width: 16 }}>{key}</span>
                     <input
                       type="text"
-                      required
+                      required={key !== "D"}
                       className="input"
-                      placeholder={`Option ${key} text`}
+                      placeholder={key === "D" ? `Option D (leave empty for 3 options)` : `Option ${key} text`}
                       value={val}
                       onChange={(e) => setVal(e.target.value)}
                       style={{ border: isCorrect ? "1px solid var(--success)" : undefined }}
@@ -271,7 +275,7 @@ export default function EditQuestionPage() {
           {/* Audio Upload */}
           <div style={{ padding: 16, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>🎧 Audio</h3>
-            {question.audioUrl && (
+            {question.audioUrl && question.audioUrl !== "null" && (
               <div style={{ marginBottom: 12 }}>
                 <audio src={question.audioUrl} controls style={{ width: "100%" }} key={question.audioUrl} />
                 <div style={{ fontSize: 12, color: "var(--success)", wordBreak: "break-all", marginTop: 4 }}>
@@ -296,7 +300,7 @@ export default function EditQuestionPage() {
           {/* Image Upload */}
           <div style={{ padding: 16, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>🖼️ Image</h3>
-            {question.imageUrl && (
+            {question.imageUrl && question.imageUrl !== "null" && (
               <div style={{ marginBottom: 12 }}>
                 <img src={question.imageUrl} alt="Question Image" style={{ width: "100%", borderRadius: 8, objectFit: "contain", maxHeight: 150 }} />
                 <div style={{ fontSize: 12, color: "var(--success)", wordBreak: "break-all", marginTop: 4 }}>
