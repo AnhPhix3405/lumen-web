@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { getMySessions, MySessions } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function MyResultsPage() {
+  const router = useRouter();
   const [sessions, setSessions] = useState<MySessions[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,12 @@ export default function MyResultsPage() {
                 const pct = Math.round(s.correctRatio * 100);
 
                 return (
-                  <tr key={s.id} style={{ borderBottom: "1px solid var(--border)", transition: "background 0.2s" }} className="table-row-hover">
+                  <tr 
+                    key={s.id} 
+                    onClick={() => router.push(`/my-results/${s.id}`)}
+                    style={{ borderBottom: "1px solid var(--border)", transition: "background 0.2s", cursor: "pointer" }} 
+                    className="table-row-hover"
+                  >
                     <td style={tdStyle}>
                       <span style={{ fontWeight: 600, color: "#fff" }}>{s.exam?.name}</span>
                     </td>

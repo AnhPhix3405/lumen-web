@@ -141,6 +141,16 @@ export interface PaginatedTopics {
   totalPages: number;
 }
 
+export interface TopicAnalysisItem {
+  topicId: string | null;
+  topicName: string;
+  correct: number;
+  incorrect: number;
+  skipped: number;
+  accuracy: number;
+  questionIds: string[];
+}
+
 // ─── Exam Endpoints ───────────────────────────────────────────────────────────
 
 export const listPublishedExams = () =>
@@ -391,6 +401,11 @@ export const finishSession = (sessionId: string) =>
     method: "POST",
     body: JSON.stringify({}),
   });
+
+export const getTopicAnalysis = (sessionId: string, partId?: string) =>
+  authed<{ data: TopicAnalysisItem[]; message: string; status: number }>(
+    `/exam/session/${sessionId}/topic-analysis${partId ? `?partId=${partId}` : ""}`
+  );
 
 // ─── Topics ──────────────────────────────────────────────────────────────────
 
