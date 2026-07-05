@@ -574,9 +574,12 @@ Creates a question that belongs to a question group.
     "key": "B"
   },
   "score": 1,
-  "questionOrder": 1
+  "questionOrder": 1,
+  "topicIds": ["uuid-1", "uuid-2"]
 }
 ```
+
+`topicIds` is optional — a list of topic UUIDs to associate with the question.
 
 **Response `201`:**
 
@@ -589,7 +592,11 @@ Creates a question that belongs to a question group.
     "content": "What is the speakers main concern?",
     "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
     "score": 1,
-    "questionOrder": 1
+    "questionOrder": 1,
+    "questionTopics": [
+      { "topicId": "uuid-1", "topic": { "id": "uuid-1", "name": "Listening Comprehension" } },
+      { "topicId": "uuid-2", "topic": { "id": "uuid-2", "name": "Vocabulary" } }
+    ]
   },
   "message": "Question created successfully",
   "status": 201
@@ -615,7 +622,10 @@ Returns all questions in a question group (sorted by question order).
       "content": "What is the speaker's main concern?",
       "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
       "score": 1,
-      "questionOrder": 1
+      "questionOrder": 1,
+      "questionTopics": [
+        { "topicId": "uuid-1", "topic": { "id": "uuid-1", "name": "Listening Comprehension" } }
+      ]
     }
   ],
   "message": "Questions fetched successfully",
@@ -794,9 +804,12 @@ Creates a standalone question directly in a part (not inside a group). This endp
     "key": "B"
   },
   "score": 1,
-  "questionOrder": 1
+  "questionOrder": 1,
+  "topicIds": ["uuid-1", "uuid-2"]
 }
 ```
+
+`topicIds` is optional — a list of topic UUIDs to associate with the question.
 
 **Response `201`:**
 
@@ -809,7 +822,11 @@ Creates a standalone question directly in a part (not inside a group). This endp
     "content": "What is the sum of 2 and 3?",
     "options": { "A": "4", "B": "5", "C": "6", "D": "7" },
     "score": 1,
-    "questionOrder": 1
+    "questionOrder": 1,
+    "questionTopics": [
+      { "topicId": "uuid-1", "topic": { "id": "uuid-1", "name": "Listening Comprehension" } },
+      { "topicId": "uuid-2", "topic": { "id": "uuid-2", "name": "Vocabulary" } }
+    ]
   },
   "message": "Question created successfully",
   "status": 201
@@ -863,7 +880,7 @@ Starts a new exam session (attempt).
 
 ## Get Session
 
-Returns session details with exam info and user answers.
+Returns session details with exam info and user answers, plus computed summary fields.
 
 **Endpoint:** `GET /exam/session/:sessionId`
 
@@ -874,9 +891,20 @@ Returns session details with exam info and user answers.
   "data": {
     "id": "uuid",
     "userId": "uuid",
-    "status": "in_progress",
+    "status": "completed",
     "startedAt": "2026-06-12T12:00:00.000Z",
     "timeLimitSeconds": 1800,
+    "durationSeconds": 1245,
+    "totalCorrect": 7,
+    "totalQuestions": 10,
+    "totalScore": 7,
+    "correctRatio": 0.7,
+    "result": "7/10",
+    "accuracy": 0.7,
+    "completionTime": 1245,
+    "correctCount": 7,
+    "incorrectCount": 2,
+    "skippedCount": 1,
     "exam": {
       "id": "uuid",
       "name": "IELTS Listening Test 1",
@@ -993,6 +1021,8 @@ Finalizes an in-progress session: calculates scores, marks it completed, and ret
     "status": "completed",
     "totalScore": 7,
     "totalCorrect": 7,
+    "totalIncorrect": 2,
+    "totalSkipped": 1,
     "totalQuestions": 10,
     "correctRatio": 0.7,
     "durationSeconds": 1245
@@ -1004,35 +1034,172 @@ Finalizes an in-progress session: calculates scores, marks it completed, and ret
 
 ---
 
+## Topic Analysis
+
+Returns per-topic breakdown of answers for a session. Optionally filter by part.
+
+**Endpoint:** `GET /exam/session/:sessionId/topic-analysis`
+
+**Query Parameters:**
+
+| Param    | Type   | Required | Description                    |
+|----------|--------|----------|--------------------------------|
+| `partId` | string | No       | Filter results to a specific part |
+
+**Response `200`:**
+
+```json
+{
+  "data": [
+    {
+      "topicId": "uuid",
+      "topicName": "Listening Comprehension",
+      "correct": 5,
+      "incorrect": 1,
+      "skipped": 0,
+      "accuracy": 0.833,
+      "questionIds": ["uuid-1", "uuid-2", "uuid-3"]
+    },
+    {
+      "topicId": null,
+      "topicName": "Untagged",
+      "correct": 2,
+      "incorrect": 1,
+      "skipped": 1,
+      "accuracy": 0.5,
+      "questionIds": ["uuid-4", "uuid-5"]
+    }
+  ],
+  "message": "Topic analysis fetched successfully",
+  "status": 200
+}
+```
+
+When no `partId` is specified, results are sorted alphabetically A→Z by topic name. An `"Untagged"` entry is included for questions without topics.
+
+---
+
+## Get All Topics
+
+Returns a paginated list of all topics.
+
+**Endpoint:** `GET /exam/topics`
+
+**Query Parameters:**
+
+| Param   | Type   | Required | Default | Description          |
+|---------|--------|----------|---------|----------------------|
+| `page`  | number | No       | 1       | Page number          |
+| `limit` | number | No       | 20      | Items per page       |
+
+**Response `200`:**
+
+```json
+{
+  "data": {
+    "data": [
+      { "id": "uuid", "name": "Listening Comprehension", "description": "Topics related to listening", "createdAt": "..." },
+      { "id": "uuid", "name": "Reading Comprehension", "description": null, "createdAt": "..." }
+    ],
+    "total": 25,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 2
+  },
+  "message": "Topics fetched successfully",
+  "status": 200
+}
+```
+
+---
+
+## Replace Question Topics
+
+Replaces all topic associations for a question. Existing topics are removed and replaced with the provided list.
+
+**Endpoint:** `PATCH /exam/question/:questionId/topics`
+
+**Request Body:**
+
+```json
+{
+  "topicIds": ["uuid-1", "uuid-2"]
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "content": "What is the speaker's main concern?",
+    "questionTopics": [
+      { "topicId": "uuid-1", "topic": { "id": "uuid-1", "name": "Listening Comprehension" } },
+      { "topicId": "uuid-2", "topic": { "id": "uuid-2", "name": "Vocabulary" } }
+    ]
+  },
+  "message": "Question topics updated successfully",
+  "status": 200
+}
+```
+
+---
+
+## Get Topics of a Question
+
+Returns all topics associated with a question.
+
+**Endpoint:** `GET /exam/topics/question/:questionId`
+
+**Response `200`:**
+
+```json
+{
+  "data": [
+    { "id": "uuid", "name": "Listening Comprehension", "description": "Topics related to listening", "createdAt": "..." },
+    { "id": "uuid", "name": "Vocabulary", "description": null, "createdAt": "..." }
+  ],
+  "message": "Question topics fetched successfully",
+  "status": 200
+}
+```
+
+---
+
 ## Summary
 
-| Endpoint                                              | Method | Notes                    |
-|-------------------------------------------------------|--------|--------------------------|
-| `/exam`                                               | GET    | List published exams     |
-| `/exam`                                               | POST   | Create exam              |
-| `/exam/update/:examId`                                | PATCH  | Update exam              |
-| `/exam/:examId`                                       | GET    | Full exam tree           |
-| `/exam/my`                                            | GET    | User's own exams         |
-| `/exam/exam-types`                                    | GET    | List exam types          |
-| `/exam/exam-types/:id`                                | GET    | Exam type by ID          |
-| `/exam/publish/request`                               | POST   | Request publishing       |
-| `/exam/:examId/part`                                  | POST   | Create part              |
-| `/exam/parts/exam/:examId`                            | GET    | Parts by exam            |
-| `/exam/part/:partId`                                  | GET    | Part details with groups |
-| `/exam/part/:partId/question-group`                   | POST   | Create question group    |
-| `/exam/question-group/part/:partId`                   | GET    | Groups by part           |
-| `/exam/question-group/:id`                            | GET    | Group with questions     |
-| `/exam/question-group/:questionGroupId/upload-audio`  | PATCH  | `multipart/form-data`    |
-| `/exam/question-group/:questionGroupId/question`      | POST   | Create question in group |
-| `/exam/question/by-group/:questionGroupId`            | GET    | Questions in group       |
-| `/exam/question/by-part/:partId`                      | GET    | Standalone questions     |
-| `/exam/question/:id`                                  | GET    | Question by ID           |
-| `/exam/question/:questionId`                          | PATCH  | Update question          |
-| `/exam/question/:questionId/upload-audio`             | PATCH  | `multipart/form-data`    |
-| `/exam/question/:questionId/upload-image`             | PATCH  | `multipart/form-data`    |
-| `/exam/part/:partId/question`                         | POST   | Create standalone question|
-| `/exam/create-session/:examId`                        | POST   | Start session            |
-| `/exam/session/:sessionId`                            | GET    | Session details          |
-| `/exam/sessions/my`                                   | GET    | User's sessions          |
-| `/exam/submit-answers/:sessionId`                     | POST   | Submit answers           |
-| `/exam/finish-session/:sessionId`                     | POST   | Finish & score           |
+| Endpoint                                               | Method | Notes                       | Controller         |
+|--------------------------------------------------------|--------|-----------------------------|--------------------|
+| `/exam`                                                | GET    | List published exams        | ExamController     |
+| `/exam`                                                | POST   | Create exam                 | ExamController     |
+| `/exam/update/:examId`                                 | PATCH  | Update exam                 | ExamController     |
+| `/exam/:examId`                                        | GET    | Full exam tree              | ExamController     |
+| `/exam/my`                                             | GET    | User's own exams            | ExamController     |
+| `/exam/exam-types`                                     | GET    | List exam types             | ExamController     |
+| `/exam/exam-types/:id`                                 | GET    | Exam type by ID             | ExamController     |
+| `/exam/publish/request`                                | POST   | Request publishing          | ExamController     |
+| `/exam/:examId/part`                                   | POST   | Create part                 | PartController     |
+| `/exam/parts/exam/:examId`                             | GET    | Parts by exam               | PartController     |
+| `/exam/part/:partId`                                   | GET    | Part details with groups    | PartController     |
+| `/exam/part/:partId/question-group`                    | POST   | Create question group       | QuestionGroupController |
+| `/exam/question-group/part/:partId`                    | GET    | Groups by part              | QuestionGroupController |
+| `/exam/question-group/:id`                             | GET    | Group with questions        | QuestionGroupController |
+| `/exam/question-group/:questionGroupId/upload-audio`   | PATCH  | `multipart/form-data`       | QuestionGroupController |
+| `/exam/question-group/:questionGroupId/question`       | POST   | Create question in group    | QuestionGroupController |
+| `/exam/create-session/:examId`                         | POST   | Start session               | SessionController  |
+| `/exam/submit-answers/:sessionId`                      | POST   | Submit answers              | SessionController  |
+| `/exam/finish-session/:sessionId`                      | POST   | Finish & score              | SessionController  |
+| `/exam/session/:sessionId`                             | GET    | Session details (enriched)  | SessionController  |
+| `/exam/sessions/my`                                    | GET    | User's sessions             | SessionController  |
+| `/exam/session/:sessionId/topic-analysis`              | GET    | Topic analysis by session   | SessionController  |
+| `/exam/question/by-group/:questionGroupId`             | GET    | Questions in group          | QuestionController |
+| `/exam/question/by-part/:partId`                       | GET    | Standalone questions        | QuestionController |
+| `/exam/question/:id`                                   | GET    | Question by ID              | QuestionController |
+| `/exam/question/:questionId`                           | PATCH  | Update question             | QuestionController |
+| `/exam/question/:questionId/upload-audio`              | PATCH  | `multipart/form-data`       | QuestionController |
+| `/exam/question/:questionId/upload-image`              | PATCH  | `multipart/form-data`       | QuestionController |
+| `/exam/question/:questionId/topics`                    | PATCH  | Replace question topics     | QuestionController |
+| `/exam/part/:partId/question`                          | POST   | Create standalone question  | QuestionController |
+| `/exam/topics`                                          | GET    | Paginated topics list       | TopicController    |
+| `/exam/topics/question/:questionId`                     | GET    | Topics of a question        | TopicController    |

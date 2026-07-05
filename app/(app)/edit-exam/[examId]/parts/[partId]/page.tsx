@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getPartDetails, createQuestionGroup, createStandaloneQuestion, Part, QuestionGroup, Question } from "@/lib/exam-api";
+import { getPartDetails, createQuestionGroup, createStandaloneQuestion, Part, QuestionGroup, Question, getAllTopics, Topic } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
 
@@ -14,6 +14,8 @@ export default function EditPartPage() {
   const [standaloneQs, setStandaloneQs] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [topics, setTopics] = useState<Topic[]>([]);
 
   // New Group Form State
   const [groupOrder, setGroupOrder] = useState(1);
@@ -35,13 +37,18 @@ export default function EditPartPage() {
   const [correctKey, setCorrectKey] = useState("A");
   const [creatingQ, setCreatingQ] = useState(false);
   const [qError, setQError] = useState<string | null>(null);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
 
-  const fetchPart = async () => {
+  const fetchPartAndTopics = async () => {
     if (!partId) return;
     try {
-      const resPart = await getPartDetails(partId);
+      const [resPart, resTopics] = await Promise.all([
+        getPartDetails(partId),
+        getAllTopics(1, 100)
+      ]);
       const part = resPart.data;
       setPart(part);
+      setTopics(resTopics.data.data);
       const questions = part.questions ?? [];
       setStandaloneQs(questions);
       // Automatically increment orders based on existing lengths
@@ -49,14 +56,14 @@ export default function EditPartPage() {
       setQOrder(questions.length + 1);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
-      else setError("Failed to load part details.");
+      else setError("Failed to load part details or topics.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPart();
+    fetchPartAndTopics();
   }, [partId]);
 
   const handleCreateGroup = async (e: React.FormEvent) => {
@@ -74,7 +81,7 @@ export default function EditPartPage() {
       });
       setGroupContent("");
       setGroupTranscript("");
-      await fetchPart();
+      await fetchPartAndTopics();
     } catch (err) {
       if (err instanceof ApiError) setGroupError(err.message);
       else setGroupError("Failed to create question group.");
@@ -106,6 +113,7 @@ export default function EditPartPage() {
         correctOption: { key: correctKey },
         score: qScore,
         questionOrder: qOrder,
+        topicIds: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
       });
       setQContent("");
       setQExplanation("");
@@ -113,7 +121,8 @@ export default function EditPartPage() {
       setOptionB("");
       setOptionC("");
       setOptionD("");
-      await fetchPart();
+      setSelectedTopicIds([]);
+      await fetchPartAndTopics();
     } catch (err) {
       if (err instanceof ApiError) setQError(err.message);
       else setQError("Failed to create question.");
@@ -362,6 +371,25 @@ export default function EditPartPage() {
                     value={qExplanation}
                     onChange={(e) => setQExplanation(e.target.value)}
                   />
+                </div>
+
+                <div className="field">
+                  <label>Topics (optional)</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {topics.map((t) => (
+                      <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: 16, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTopicIds.includes(t.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedTopicIds((prev) => [...prev, t.id]);
+                            else setSelectedTopicIds((prev) => prev.filter((id) => id !== t.id));
+                          }}
+                        />
+                        {t.name}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {qError && <div className="alert alert-error">{qError}</div>}

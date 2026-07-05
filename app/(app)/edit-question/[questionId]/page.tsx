@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getQuestionById, updateQuestion, uploadQuestionAudio, uploadQuestionImage, Question } from "@/lib/exam-api";
+import { getQuestionById, updateQuestion, uploadQuestionAudio, uploadQuestionImage, Question, getAllTopics, replaceQuestionTopics, Topic } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
 
@@ -36,24 +36,48 @@ export default function EditQuestionPage() {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [mediaSuccess, setMediaSuccess] = useState<string | null>(null);
 
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
+
   useEffect(() => {
     if (!questionId) return;
-    getQuestionById(questionId)
-      .then((res) => {
-        const q = res.data;
+
+    Promise.all([
+      getQuestionById(questionId),
+      getAllTopics(1, 100)
+    ])
+      .then(([resQ, resTopics]) => {
+        const q = resQ.data;
         setQuestion(q);
         setQContent(q.content || "");
         setQExplanation(q.explanation || "");
         setQScore(q.score || 1);
         setQOrder(q.questionOrder || 1);
-        if (q.options) {
-          setOptionA(q.options.A || "");
-          setOptionB(q.options.B || "");
-          setOptionC(q.options.C || "");
-          setOptionD(q.options.D || "");
+        
+        let opts = q.options;
+        if (typeof opts === 'string') {
+          try { opts = JSON.parse(opts); } catch (e) {}
         }
+        
+        if (opts) {
+          setOptionA(opts.A || "");
+          setOptionB(opts.B || "");
+          setOptionC(opts.C || "");
+          setOptionD(opts.D || "");
+        }
+        
         if (q.correctOption?.key) {
           setCorrectKey(q.correctOption.key);
+        }
+        
+        setTopics(resTopics.data.data);
+        
+        // Extract selected topic IDs from the question directly
+        if (q.questionTopics) {
+          const currentTopicIds = q.questionTopics.map(qt => qt.topicId);
+          setSelectedTopicIds(currentTopicIds);
+        } else {
+          setSelectedTopicIds([]);
         }
       })
       .catch((err) => {
@@ -88,6 +112,10 @@ export default function EditQuestionPage() {
         score: qScore,
         questionOrder: qOrder,
       });
+      
+      // Update topics
+      await replaceQuestionTopics(questionId, selectedTopicIds);
+      
       setSuccessMsg("Question updated successfully!");
       setQuestion(res.data);
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -256,6 +284,25 @@ export default function EditQuestionPage() {
               value={qExplanation}
               onChange={(e) => setQExplanation(e.target.value)}
             />
+          </div>
+
+          <div className="field">
+            <label>Topics (optional)</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {topics.map((t) => (
+                <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: 16, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTopicIds.includes(t.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedTopicIds((prev) => [...prev, t.id]);
+                      else setSelectedTopicIds((prev) => prev.filter((id) => id !== t.id));
+                    }}
+                  />
+                  {t.name}
+                </label>
+              ))}
+            </div>
           </div>
 
           {error && <div className="alert alert-error">{error}</div>}

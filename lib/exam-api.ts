@@ -42,6 +42,7 @@ export interface ExamSummary {
   durationMinutes: number;
   totalScore: number;
   visibility: string;
+  thumbnailUrl?: string;
   isPublished: boolean;
   examType: ExamType;
 }
@@ -59,6 +60,7 @@ export interface Question {
   partId?: string;
   audioUrl?: string | null;
   imageUrl?: string | null;
+  questionTopics?: { topicId: string; topic: Topic }[];
 }
 
 export interface QuestionGroup {
@@ -122,6 +124,21 @@ export interface MySessions {
   totalQuestions: number;
   correctRatio: number;
   exam: { id: string; name: string };
+}
+
+export interface Topic {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt?: string;
+}
+
+export interface PaginatedTopics {
+  data: Topic[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 // ─── Exam Endpoints ───────────────────────────────────────────────────────────
@@ -251,6 +268,7 @@ export const createQuestionInGroup = (
     correctOption: { key: string };
     score: number;
     questionOrder: number;
+    topicIds?: string[];
   }
 ) =>
   authed<{ data: Question; message: string; status: number }>(
@@ -267,6 +285,7 @@ export const createStandaloneQuestion = (
     correctOption: { key: string };
     score: number;
     questionOrder: number;
+    topicIds?: string[];
   }
 ) =>
   authed<{ data: Question; message: string; status: number }>(
@@ -371,4 +390,18 @@ export const finishSession = (sessionId: string) =>
   }>(`/exam/finish-session/${sessionId}`, {
     method: "POST",
     body: JSON.stringify({}),
+  });
+
+// ─── Topics ──────────────────────────────────────────────────────────────────
+
+export const getAllTopics = (page = 1, limit = 100) =>
+  authed<{ data: PaginatedTopics; message: string; status: number }>(`/exam/topics?page=${page}&limit=${limit}`);
+
+export const getQuestionTopics = (questionId: string) =>
+  authed<{ data: { topicId: string; topic: Topic }[]; message: string; status: number }>(`/exam/topics/question/${questionId}`);
+
+export const replaceQuestionTopics = (questionId: string, topicIds: string[]) =>
+  authed<{ data: Question; message: string; status: number }>(`/exam/question/${questionId}/topics`, {
+    method: "PATCH",
+    body: JSON.stringify({ topicIds }),
   });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getQuestionGroup, createQuestionInGroup, QuestionGroup, Question } from "@/lib/exam-api";
+import { getQuestionGroup, createQuestionInGroup, QuestionGroup, Question, getAllTopics, Topic } from "@/lib/exam-api";
 import { ApiError } from "@/lib/api-client";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -14,6 +14,8 @@ export default function EditQuestionGroupPage() {
   const [group, setGroup] = useState<QuestionGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [topics, setTopics] = useState<Topic[]>([]);
 
   // New Question Form State
   const [qContent, setQContent] = useState("");
@@ -27,23 +29,28 @@ export default function EditQuestionGroupPage() {
   const [correctKey, setCorrectKey] = useState("A");
   const [creatingQ, setCreatingQ] = useState(false);
   const [qError, setQError] = useState<string | null>(null);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
 
-  const fetchGroup = async () => {
+  const fetchGroupAndTopics = async () => {
     if (!groupId) return;
     try {
-      const res = await getQuestionGroup(groupId);
+      const [res, resTopics] = await Promise.all([
+        getQuestionGroup(groupId),
+        getAllTopics(1, 100)
+      ]);
       setGroup(res.data);
+      setTopics(resTopics.data.data);
       setQOrder((res.data.questions?.length ?? 0) + 1);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
-      else setError("Failed to load question group details.");
+      else setError("Failed to load question group details or topics.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchGroup();
+    fetchGroupAndTopics();
   }, [groupId]);
 
   const handleCreateQuestion = async (e: React.FormEvent) => {
@@ -69,6 +76,7 @@ export default function EditQuestionGroupPage() {
         correctOption: { key: correctKey },
         score: qScore,
         questionOrder: qOrder,
+        topicIds: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
       });
 
       // Clear fields
@@ -78,8 +86,9 @@ export default function EditQuestionGroupPage() {
       setOptionB("");
       setOptionC("");
       setOptionD("");
+      setSelectedTopicIds([]);
 
-      await fetchGroup();
+      await fetchGroupAndTopics();
     } catch (err) {
       if (err instanceof ApiError) setQError(err.message);
       else setQError("Failed to add question.");
@@ -289,6 +298,25 @@ export default function EditQuestionGroupPage() {
                 value={qExplanation}
                 onChange={(e) => setQExplanation(e.target.value)}
               />
+            </div>
+
+            <div className="field">
+              <label>Topics (optional)</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {topics.map((t) => (
+                  <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: 16, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedTopicIds.includes(t.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedTopicIds((prev) => [...prev, t.id]);
+                        else setSelectedTopicIds((prev) => prev.filter((id) => id !== t.id));
+                      }}
+                    />
+                    {t.name}
+                  </label>
+                ))}
+              </div>
             </div>
 
             {qError && <div className="alert alert-error">{qError}</div>}
