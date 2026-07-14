@@ -223,11 +223,11 @@ export default function SessionDetailPage() {
                   <td style={tdStyle}>{(topic.accuracy * 100).toFixed(2)}%</td>
                   <td style={tdStyle}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {/* For now we just render question IDs as circles or simple badges. Usually it's question indices. */}
-                      {topic.questionIds.map((qid, idx) => (
+                      {/* Render question sequence as circles or simple badges. */}
+                      {topic.questions?.map((q) => (
                         <div
-                          key={qid}
-                          title={qid}
+                          key={q.id}
+                          title={`Question ID: ${q.id}`}
                           style={{
                             width: 32,
                             height: 32,
@@ -241,9 +241,7 @@ export default function SessionDetailPage() {
                             color: "var(--text-secondary)"
                           }}
                         >
-                          {/* If we had question indexes we would show them, but we only have IDs, so we can just show a number sequentially or something? 
-                              Let's just show an index for now, as questionIds are uuids and too long to fit in a circle. */}
-                          {idx + 1}
+                          {q.sequence}
                         </div>
                       ))}
                     </div>

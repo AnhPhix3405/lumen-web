@@ -148,7 +148,7 @@ export interface TopicAnalysisItem {
   incorrect: number;
   skipped: number;
   accuracy: number;
-  questionIds: string[];
+  questions: { id: string; sequence: number }[];
 }
 
 // ─── Exam Endpoints ───────────────────────────────────────────────────────────
@@ -299,7 +299,7 @@ export const createStandaloneQuestion = (
   }
 ) =>
   authed<{ data: Question; message: string; status: number }>(
-    `/exam/part/${partId}/question`,
+    `/exam/question/by-part/${partId}`,
     { method: "POST", body: JSON.stringify(body) }
   );
 
